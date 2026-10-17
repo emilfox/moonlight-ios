@@ -18,7 +18,7 @@
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
 // ---- Game camera mode: finger drags only move the mouse. No clicks, ever. ----
 static const BOOL USE_GAME_CAMERA = YES;          // NO = original touchpad behavior
-static const float GAME_CAMERA_SENSITIVITY = 1.5f; // raise = faster camera
+static const float GAME_CAMERA_SENSITIVITY = 3.0f; // raise = faster camera
 
 @interface GameCameraTouchHandler : UIResponder
 - (instancetype)initWithView:(UIView*)view;
