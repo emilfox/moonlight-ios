@@ -16,7 +16,73 @@
 #import "KeyboardInputField.h"
 
 static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
+// ---- Game camera mode: finger drags only move the mouse. No clicks, ever. ----
+static const BOOL USE_GAME_CAMERA = YES;          // NO = original touchpad behavior
+static const float GAME_CAMERA_SENSITIVITY = 1.5f; // raise = faster camera
 
+@interface GameCameraTouchHandler : UIResponder
+- (instancetype)initWithView:(UIView*)view;
+@end
+
+@implementation GameCameraTouchHandler {
+    __weak UIView* view;
+    UITouch* cameraTouch;     // the one finger currently steering the camera
+    CGPoint lastLocation;
+    double remainderX, remainderY; // fractional movement carried to the next event
+}
+
+- (instancetype)initWithView:(UIView*)v {
+    self = [super init];
+    if (self) {
+        view = v;
+    }
+    return self;
+}
+
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (cameraTouch != nil) {
+        return; // already steering with another finger
+    }
+    cameraTouch = [touches anyObject];
+    lastLocation = [cameraTouch locationInView:view];
+    remainderX = 0;
+    remainderY = 0;
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (cameraTouch == nil || ![touches containsObject:cameraTouch]) {
+        return;
+    }
+    CGPoint current = [cameraTouch locationInView:view];
+    double scale = GAME_CAMERA_SENSITIVITY * (1280.0 / view.bounds.size.width);
+    double totalX = (current.x - lastLocation.x) * scale + remainderX;
+    double totalY = (current.y - lastLocation.y) * scale + remainderY;
+    lastLocation = current;
+
+    short sendX = (short)totalX;
+    short sendY = (short)totalY;
+    remainderX = totalX - sendX;
+    remainderY = totalY - sendY;
+
+    if (sendX != 0 || sendY != 0) {
+        LiSendMouseMoveEvent(sendX, sendY);
+    }
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (cameraTouch != nil && [touches containsObject:cameraTouch]) {
+        cameraTouch = nil;
+    }
+}
+
+- (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event {
+    if (cameraTouch != nil && [touches containsObject:cameraTouch]) {
+        cameraTouch = nil;
+    }
+}
+
+@end
+// ---- end game camera mode ----
 @implementation StreamView {
     OnScreenControls* onScreenControls;
     
@@ -69,6 +135,9 @@ static const double X1_MOUSE_SPEED_DIVISOR = 2.5;
     // iOS uses RelativeTouchHandler or AbsoluteTouchHandler depending on user preference
     if (settings.absoluteTouchMode) {
         self->touchHandler = [[AbsoluteTouchHandler alloc] initWithView:self];
+        }
+    else if (USE_GAME_CAMERA) {
+        self->touchHandler = [[GameCameraTouchHandler alloc] initWithView:self];
     }
     else {
         self->touchHandler = [[RelativeTouchHandler alloc] initWithView:self];
